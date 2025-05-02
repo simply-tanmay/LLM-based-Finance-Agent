@@ -5,8 +5,8 @@ from stock_prediction import StockPredictor
 import yfinance as yf
 import pandas as pd
 
-def run_prediction(symbol='AAPL', days=7):
-    print(f"\nRunning stock prediction for {symbol} ({days} days)")
+def run_lstm_prediction(symbol='AAPL', days=7):
+    print(f"\nRunning LSTM prediction for {symbol} ({days} days)")
     print("=" * 50)
     
     # Initialize predictor
@@ -47,7 +47,7 @@ def run_prediction(symbol='AAPL', days=7):
     for i, pred in enumerate(prediction, 1):
         print(f"Day {i}: ${pred:.2f}")
 
-def run_backtesting(config):
+def run_agent_backtesting(config):
     try:
         agent = Agent(config)
         
@@ -70,11 +70,15 @@ def main():
         with open('config.json', 'r', encoding="utf-8") as file:
             config = json.load(file)
         
-        # Run prediction
-        run_prediction(config['stock_symbol'], days=7)
+        # Choose which model to run
+        model_type = input("Choose model type (1 for LSTM, 2 for Agent): ")
         
-        # Run backtesting
-        run_backtesting(config)
+        if model_type == "1":
+            run_lstm_prediction(config['stock_symbol'], days=7)
+        elif model_type == "2":
+            run_agent_backtesting(config)
+        else:
+            print("Invalid choice. Please choose 1 or 2.")
         
     except Exception as e:
         print(f"Error in main: {str(e)}")

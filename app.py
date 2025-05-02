@@ -45,10 +45,19 @@ def predict():
         start_date = end_date - timedelta(days=90)  # Using last 90 days to ensure we have enough data
         
         # Use cached function to get stock data
-        stock_data = get_stock_data(symbol, start_date, end_date)
+        try:
+            stock_data = get_stock_data(symbol, start_date, end_date)
+        except Exception as e:
+            error_msg = str(e)
+            if "delisted" in error_msg.lower():
+                return jsonify({'error': f'Stock {symbol} might be delisted or not available on Yahoo Finance. Please try a different symbol.'}), 400
+            elif "no data found" in error_msg.lower():
+                return jsonify({'error': f'No data found for {symbol}. Please check if the symbol is correct.'}), 400
+            else:
+                return jsonify({'error': f'Error fetching data for {symbol}: {error_msg}'}), 400
         
         if stock_data.empty:
-            return jsonify({'error': 'No data found for the given symbol'}), 400
+            return jsonify({'error': f'No data found for {symbol}. Please check if the symbol is correct.'}), 400
             
         # Prepare data for prediction
         df = pd.DataFrame(stock_data)
