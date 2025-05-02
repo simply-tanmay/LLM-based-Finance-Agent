@@ -4,7 +4,7 @@ try:
     import yfinance_cache as yf
     print("Using yfinance-cache")
 except ImportError:
-    import yfinance as yf
+import yfinance as yf
     print("Using standard yfinance")
 import matplotlib.pyplot as plt
 import google.generativeai as genai
@@ -59,7 +59,7 @@ class Agent():
         time.sleep(delay)
         
         try:
-            stock_data = yf.download(self.config['stock_symbol'], start=start_date, end=date)
+        stock_data = yf.download(self.config['stock_symbol'], start=start_date, end=date)
             if stock_data.empty:
                 print("No data downloaded. Trying alternative method...")
                 ticker = yf.Ticker(self.config['stock_symbol'])
@@ -68,7 +68,7 @@ class Agent():
             if stock_data.empty:
                 raise ValueError(f"No data found for {self.config['stock_symbol']}")
                 
-            return stock_data
+        return stock_data
         except Exception as e:
             print(f"Error downloading stock data: {str(e)}")
             raise
@@ -78,26 +78,26 @@ class Agent():
         delay = randint(1, 3)
         print(f"Waiting {delay} seconds before fetching news...")
         time.sleep(delay)
-        
+
         try:
-            stock = yf.Ticker(self.config['stock_symbol'])
-            stock_info = stock.info
-            stock_name = stock_info.get('longName', self.config['stock_symbol'])
+        stock = yf.Ticker(self.config['stock_symbol'])
+        stock_info = stock.info
+        stock_name = stock_info.get('longName', self.config['stock_symbol'])
 
-            previous_date = date - timedelta(days=1)
-            start_date = previous_date.strftime("%Y-%m-%d")
-            end_date = date.strftime("%Y-%m-%d")
+        previous_date = date - timedelta(days=1)
+        start_date = previous_date.strftime("%Y-%m-%d")
+        end_date = date.strftime("%Y-%m-%d")
 
-            all_articles = self.newsapi.get_everything(
-                q=stock_name,
-                from_param=start_date,
-                to=end_date,
-                language='en',
-                sort_by='relevancy'
-            )
+        all_articles = self.newsapi.get_everything(
+            q=stock_name,
+            from_param=start_date,
+            to=end_date,
+            language='en',
+            sort_by='relevancy'
+        )
 
-            titles = [article['title'] for article in all_articles['articles']]
-            return titles
+        titles = [article['title'] for article in all_articles['articles']]
+        return titles
         except Exception as e:
             print(f"Error fetching news: {str(e)}")
             return []
@@ -105,32 +105,32 @@ class Agent():
     def backtesting(self, start_date: datetime, end_date: datetime, verbose: bool = False) -> pd.DataFrame:
         try:
             print(f"Fetching data for {self.config['stock_symbol']} from {start_date} to {end_date}")
-            stock_history_data = yf.download(self.config['stock_symbol'], start=start_date, end=end_date + timedelta(days=1))
+        stock_history_data = yf.download(self.config['stock_symbol'], start=start_date, end=end_date + timedelta(days=1))
             if stock_history_data.empty:
                 raise ValueError(f"No data found for {self.config['stock_symbol']} in the specified date range")
             
-            stock_history_data.reset_index(inplace=True)
-            results = []
+        stock_history_data.reset_index(inplace=True)
+        results = []
             total_days = len(stock_history_data)
             
             print(f"\nStarting backtesting for {total_days} trading days...")
             
-            for i, date in enumerate(stock_history_data['Date']):
+        for i, date in enumerate(stock_history_data['Date']):
                 try:
                     print(f"\nProcessing day {i+1}/{total_days}: {date.strftime('%Y-%m-%d')}")
-                    actual_price = stock_history_data['Close'][i]
+            actual_price = stock_history_data['Close'][i]
                     
                     # Add a delay to avoid rate limiting
                     delay = randint(1, 3)
                     print(f"Waiting {delay} seconds before making prediction...")
                     time.sleep(delay)
                     
-                    predicted_price = self.predict(date, verbose)
-                    results.append({
-                        'Date': date.strftime("%Y-%m-%d"),
-                        'Predicted Price': predicted_price,
-                        'Actual Price': actual_price
-                    })
+            predicted_price = self.predict(date, verbose)
+            results.append({
+                'Date': date.strftime("%Y-%m-%d"),
+                'Predicted Price': predicted_price,
+                'Actual Price': actual_price
+            })
                     print(f"Predicted: {predicted_price:.2f}, Actual: {actual_price:.2f}")
                     
                 except Exception as e:
@@ -140,40 +140,40 @@ class Agent():
             if not results:
                 raise ValueError("No results were generated from the backtesting")
                 
-            results_df = pd.DataFrame(results)
+        results_df = pd.DataFrame(results)
             print(f"\nGenerated {len(results_df)} predictions out of {total_days} days")
             
-            actual_prices = results_df['Actual Price'].dropna().values
-            predicted_prices = results_df['Predicted Price'].dropna().values
+        actual_prices = results_df['Actual Price'].dropna().values
+        predicted_prices = results_df['Predicted Price'].dropna().values
             
             if len(actual_prices) == 0 or len(predicted_prices) == 0:
                 raise ValueError("No valid prices found after dropping NA values")
             
-            mse = mean_squared_error(actual_prices, predicted_prices)
-            rmse = np.sqrt(mse)
-            mae = mean_absolute_error(actual_prices, predicted_prices)
-            r2 = r2_score(actual_prices, predicted_prices)
+        mse = mean_squared_error(actual_prices, predicted_prices)
+        rmse = np.sqrt(mse)
+        mae = mean_absolute_error(actual_prices, predicted_prices)
+        r2 = r2_score(actual_prices, predicted_prices)
             
             print(f"\nBacktesting Results:")
             print(f"MSE: {mse:.2f}")
             print(f"RMSE: {rmse:.2f}")
             print(f"MAE: {mae:.2f}")
             print(f"R2 Score: {r2:.2f}")
-            
+
             # Plot the results
-            plt.figure(figsize=(12, 6))
-            plt.plot(results_df['Date'], results_df['Predicted Price'], label='Predicted', marker='o')
-            plt.plot(results_df['Date'], results_df['Actual Price'], label='Actual', marker='x')
-            plt.xlabel('Date')
-            plt.ylabel('Price')
-            plt.title('Predicted vs Actual Stock Prices')
-            plt.legend()
-            plt.xticks(rotation=45)
-            plt.grid(True)
-            plt.tight_layout()
-            plt.show()
+        plt.figure(figsize=(12, 6))
+        plt.plot(results_df['Date'], results_df['Predicted Price'], label='Predicted', marker='o')
+        plt.plot(results_df['Date'], results_df['Actual Price'], label='Actual', marker='x')
+        plt.xlabel('Date')
+        plt.ylabel('Price')
+        plt.title('Predicted vs Actual Stock Prices')
+        plt.legend()
+        plt.xticks(rotation=45)
+        plt.grid(True)
+        plt.tight_layout()
+        plt.show()
             
-            return results_df
+        return results_df
             
         except Exception as e:
             print(f"Error in backtesting: {str(e)}")

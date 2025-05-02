@@ -16,13 +16,6 @@
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
             margin-bottom: 2rem;
         }
-        .metric-card {
-            background: linear-gradient(45deg, #2193b0, #6dd5ed);
-            color: white;
-            border-radius: 10px;
-            padding: 1rem;
-            margin: 0.5rem;
-        }
         .loading {
             display: none;
             text-align: center;
@@ -30,6 +23,45 @@
         }
         .results {
             display: none;
+        }
+        .prediction-card {
+            background: linear-gradient(45deg, #2193b0, #6dd5ed);
+            color: white;
+            border-radius: 10px;
+            padding: 1rem;
+            margin: 0.5rem;
+        }
+        .console {
+            background-color: #1e1e1e;
+            color: #d4d4d4;
+            font-family: 'Courier New', monospace;
+            padding: 1rem;
+            border-radius: 5px;
+            height: 200px;
+            overflow-y: auto;
+            margin-top: 1rem;
+            white-space: pre-wrap;
+            font-size: 0.9rem;
+        }
+        .console .info {
+            color: #569cd6;
+        }
+        .console .warning {
+            color: #dcdcaa;
+        }
+        .console .error {
+            color: #f14c4c;
+        }
+        .console .success {
+            color: #4ec9b0;
+        }
+        .console .training {
+            color: #dcdcaa;
+        }
+        .chart-container {
+            position: relative;
+            height: 300px;
+            margin-bottom: 2rem;
         }
     </style>
 </head>
@@ -40,23 +72,17 @@
                 <div class="card">
                     <div class="card-body">
                         <h2 class="card-title text-center mb-4">Stock Price Predictor</h2>
-                        <form id="analysisForm">
+                        <form id="predictionForm">
                             <div class="mb-3">
-                                <label for="stock_symbol" class="form-label">Stock Symbol</label>
-                                <input type="text" class="form-control" id="stock_symbol" name="stock_symbol" value="AAPL" required>
+                                <label for="symbol" class="form-label">Stock Symbol</label>
+                                <input type="text" class="form-control" id="symbol" name="symbol" value="AAPL" required>
                             </div>
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <label for="start_date" class="form-label">Start Date</label>
-                                    <input type="date" class="form-control" id="start_date" name="start_date" required>
-                                </div>
-                                <div class="col-md-6">
-                                    <label for="end_date" class="form-label">End Date</label>
-                                    <input type="date" class="form-control" id="end_date" name="end_date" required>
-                                </div>
+                            <div class="mb-3">
+                                <label for="days" class="form-label">Days to Predict</label>
+                                <input type="number" class="form-control" id="days" name="days" value="7" min="1" max="30" required>
                             </div>
                             <div class="text-center mt-4">
-                                <button type="submit" class="btn btn-primary">Analyze</button>
+                                <button type="submit" class="btn btn-primary">Predict</button>
                             </div>
                         </form>
                     </div>
@@ -66,42 +92,41 @@
                     <div class="spinner-border text-primary" role="status">
                         <span class="visually-hidden">Loading...</span>
                     </div>
-                    <p class="mt-2">Analyzing stock data...</p>
+                    <p class="mt-2">Making predictions...</p>
                 </div>
 
                 <div class="results">
                     <div class="card">
                         <div class="card-body">
-                            <h3 class="card-title text-center mb-4">Analysis Results</h3>
-                            <canvas id="priceChart"></canvas>
+                            <h3 class="card-title text-center mb-4">Prediction Results</h3>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="prediction-card">
+                                        <h5>Current Price</h5>
+                                        <p id="currentPrice">-</p>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="prediction-card">
+                                        <h5>Next Day Prediction</h5>
+                                        <p id="nextDayPrediction">-</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="chart-container">
+                                <canvas id="historicalChart"></canvas>
+                            </div>
+                            <div class="chart-container">
+                                <canvas id="predictionChart"></canvas>
+                            </div>
                         </div>
                     </div>
+                </div>
 
-                    <div class="row mt-4">
-                        <div class="col-md-3">
-                            <div class="metric-card">
-                                <h5>MSE</h5>
-                                <p id="mse">-</p>
-                            </div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="metric-card">
-                                <h5>RMSE</h5>
-                                <p id="rmse">-</p>
-                            </div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="metric-card">
-                                <h5>MAE</h5>
-                                <p id="mae">-</p>
-                            </div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="metric-card">
-                                <h5>R² Score</h5>
-                                <p id="r2">-</p>
-                            </div>
-                        </div>
+                <div class="card mt-4">
+                    <div class="card-body">
+                        <h4 class="card-title">Console Output</h4>
+                        <div id="console" class="console"></div>
                     </div>
                 </div>
             </div>
@@ -111,85 +136,161 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
-        document.getElementById('analysisForm').addEventListener('submit', async (e) => {
+        let historicalChart = null;
+        let predictionChart = null;
+        const consoleElement = document.getElementById('console');
+
+        function logToConsole(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = document.createElement('div');
+            logEntry.className = type;
+            logEntry.textContent = `[${timestamp}] ${message}`;
+            consoleElement.appendChild(logEntry);
+            consoleElement.scrollTop = consoleElement.scrollHeight;
+        }
+
+        document.getElementById('predictionForm').addEventListener('submit', async (e) => {
             e.preventDefault();
+            
+            // Clear console
+            consoleElement.innerHTML = '';
             
             // Show loading
             document.querySelector('.loading').style.display = 'block';
             document.querySelector('.results').style.display = 'none';
             
             try {
-                const formData = new FormData(e.target);
-                const response = await fetch('/analyze', {
+                const symbol = document.getElementById('symbol').value;
+                const days = document.getElementById('days').value;
+                
+                logToConsole(`Starting prediction for ${symbol} (${days} days)`, 'info');
+                logToConsole('Fetching historical data...', 'info');
+                
+                const response = await fetch('/predict', {
                     method: 'POST',
-                    body: formData
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ symbol, days: parseInt(days) })
                 });
                 
-                const data = await response.json();
+                // Handle streaming response
+                const reader = response.body.getReader();
+                let result = '';
                 
-                if (response.ok) {
-                    // Update metrics
-                    document.getElementById('mse').textContent = data.metrics.mse.toFixed(2);
-                    document.getElementById('rmse').textContent = data.metrics.rmse.toFixed(2);
-                    document.getElementById('mae').textContent = data.metrics.mae.toFixed(2);
-                    document.getElementById('r2').textContent = data.metrics.r2.toFixed(2);
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
                     
-                    // Create chart
-                    const ctx = document.getElementById('priceChart').getContext('2d');
-                    new Chart(ctx, {
-                        type: 'line',
-                        data: {
-                            labels: data.dates,
-                            datasets: [
-                                {
-                                    label: 'Predicted Price',
-                                    data: data.predicted_prices,
-                                    borderColor: 'rgb(75, 192, 192)',
-                                    tension: 0.1
-                                },
-                                {
-                                    label: 'Actual Price',
-                                    data: data.actual_prices,
-                                    borderColor: 'rgb(255, 99, 132)',
-                                    tension: 0.1
-                                }
-                            ]
-                        },
-                        options: {
-                            responsive: true,
-                            plugins: {
-                                title: {
-                                    display: true,
-                                    text: 'Predicted vs Actual Stock Prices'
-                                }
-                            },
-                            scales: {
-                                y: {
-                                    beginAtZero: false
-                                }
+                    // Convert the chunk to text
+                    const chunk = new TextDecoder().decode(value);
+                    result += chunk;
+                    
+                    // Try to parse the chunk as JSON
+                    try {
+                        const data = JSON.parse(result);
+                        if (data.status === 'training') {
+                            logToConsole(data.message, 'training');
+                            result = ''; // Clear the result after processing
+                        } else {
+                            // This is the final response
+                            logToConsole('Data fetched successfully', 'success');
+                            logToConsole('Training model on historical data...', 'info');
+                            
+                            // Update current price and next day prediction
+                            document.getElementById('currentPrice').textContent = `$${data.last_price.toFixed(2)}`;
+                            document.getElementById('nextDayPrediction').textContent = `$${data.prediction[0].toFixed(2)}`;
+                            
+                            // Create or update historical chart
+                            const historicalCtx = document.getElementById('historicalChart').getContext('2d');
+                            if (historicalChart) {
+                                historicalChart.destroy();
                             }
+                            
+                            logToConsole('Generating historical data chart...', 'info');
+                            historicalChart = new Chart(historicalCtx, {
+                                type: 'line',
+                                data: {
+                                    labels: data.training_dates,
+                                    datasets: [{
+                                        label: 'Historical Price',
+                                        data: data.training_data,
+                                        borderColor: 'rgb(255, 99, 132)',
+                                        tension: 0.1
+                                    }]
+                                },
+                                options: {
+                                    responsive: true,
+                                    maintainAspectRatio: false,
+                                    plugins: {
+                                        title: {
+                                            display: true,
+                                            text: `${symbol} Historical Prices`
+                                        }
+                                    },
+                                    scales: {
+                                        y: {
+                                            beginAtZero: false
+                                        }
+                                    }
+                                }
+                            });
+                            
+                            // Create or update prediction chart
+                            const predictionCtx = document.getElementById('predictionChart').getContext('2d');
+                            if (predictionChart) {
+                                predictionChart.destroy();
+                            }
+                            
+                            logToConsole('Generating prediction chart...', 'info');
+                            predictionChart = new Chart(predictionCtx, {
+                                type: 'line',
+                                data: {
+                                    labels: Array.from({length: data.prediction.length}, (_, i) => `Day ${i + 1}`),
+                                    datasets: [{
+                                        label: 'Predicted Price',
+                                        data: data.prediction,
+                                        borderColor: 'rgb(75, 192, 192)',
+                                        tension: 0.1
+                                    }]
+                                },
+                                options: {
+                                    responsive: true,
+                                    maintainAspectRatio: false,
+                                    plugins: {
+                                        title: {
+                                            display: true,
+                                            text: `${symbol} Price Predictions`
+                                        }
+                                    },
+                                    scales: {
+                                        y: {
+                                            beginAtZero: false
+                                        }
+                                    }
+                                }
+                            });
+                            
+                            logToConsole('Prediction complete!', 'success');
+                            
+                            // Show results
+                            document.querySelector('.loading').style.display = 'none';
+                            document.querySelector('.results').style.display = 'block';
                         }
-                    });
-                    
-                    // Show results
-                    document.querySelector('.loading').style.display = 'none';
-                    document.querySelector('.results').style.display = 'block';
-                } else {
-                    throw new Error(data.error || 'Analysis failed');
+                    } catch (e) {
+                        // If parsing fails, continue accumulating chunks
+                        continue;
+                    }
                 }
             } catch (error) {
-                alert('Error: ' + error.message);
+                logToConsole(`Error: ${error.message}`, 'error');
                 document.querySelector('.loading').style.display = 'none';
             }
         });
 
-        // Set default dates
-        const today = new Date();
-        const oneMonthAgo = new Date();
-        oneMonthAgo.setMonth(today.getMonth() - 1);
-        
-        document.getElementById('start_date').value = oneMonthAgo.toISOString().split('T')[0];
-        document.getElementById('end_date').value = today.toISOString().split('T')[0];
+        // Initial console message
+        logToConsole('Stock Price Predictor initialized', 'info');
+        logToConsole('Enter a stock symbol and number of days to predict', 'info');
     </script>
 </body>
 </html> 
