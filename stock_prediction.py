@@ -3,6 +3,19 @@ import pandas as pd
 from sklearn.preprocessing import MinMaxScaler
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import LSTM, Dense, Dropout
+from tensorflow.keras.callbacks import Callback
+
+class TrainingProgressCallback(Callback):
+    def __init__(self, log_function):
+        self.log_function = log_function
+        self.epoch = 0
+        
+    def on_epoch_begin(self, epoch, logs=None):
+        self.epoch = epoch + 1
+        
+    def on_epoch_end(self, epoch, logs=None):
+        loss = logs.get('loss', 0)
+        self.log_function(f"Epoch {self.epoch}/50 - Loss: {loss:.6f}")
 
 class StockPredictor:
     def __init__(self):
@@ -23,6 +36,12 @@ class StockPredictor:
         return model
         
     def _prepare_data(self, data, lookback=60):
+        # Ensure data is in the correct format
+        if isinstance(data, pd.Series):
+            data = data.values.reshape(-1, 1)
+        elif isinstance(data, pd.DataFrame):
+            data = data.values
+        
         # Scale the data
         scaled_data = self.scaler.fit_transform(data)
         
@@ -33,13 +52,45 @@ class StockPredictor:
             
         return np.array(X), np.array(y)
         
-    def train(self, data, epochs=50, batch_size=32):
+    def train(self, data, epochs=50, batch_size=32, log_function=None):
+        # Ensure we have enough data for training
+        if len(data) < 60:
+            raise ValueError("Not enough data for training. Need at least 60 data points.")
+            
         X, y = self._prepare_data(data)
         X = np.reshape(X, (X.shape[0], X.shape[1], 1))
         
-        self.model.fit(X, y, epochs=epochs, batch_size=batch_size, verbose=0)
+        callbacks = []
+        if log_function:
+            callbacks.append(TrainingProgressCallback(log_function))
+        
+        history = self.model.fit(
+            X, y, 
+            epochs=epochs, 
+            batch_size=batch_size, 
+            verbose=0, 
+            callbacks=callbacks
+        )
+        
+        # Return the final loss
+        final_loss = history.history['loss'][-1]
+        if log_function:
+            log_function(f"Training complete - Final loss: {final_loss:.6f}")
         
     def predict(self, data, days=7):
+        # Ensure data is in the correct format
+        if isinstance(data, pd.Series):
+            data = data.values.reshape(-1, 1)
+        elif isinstance(data, pd.DataFrame):
+            data = data.values
+            
+        # Ensure we have enough data for prediction
+        if len(data) < 60:
+            raise ValueError("Not enough data for prediction. Need at least 60 data points.")
+        
+        # First fit the scaler on the training data
+        self.scaler.fit(data)
+        
         # Prepare the data
         scaled_data = self.scaler.transform(data)
         
