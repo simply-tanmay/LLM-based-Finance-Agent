@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 from sklearn.preprocessing import MinMaxScaler
 from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import LSTM, Dense, Dropout
+from tensorflow.keras.layers import LSTM, Dense, Dropout, Input
 from tensorflow.keras.callbacks import Callback
 
 class TrainingProgressCallback(Callback):
@@ -24,7 +24,8 @@ class StockPredictor:
         
     def _build_model(self):
         model = Sequential([
-            LSTM(units=50, return_sequences=True, input_shape=(60, 1)),
+            Input(shape=(60, 1)),
+            LSTM(units=50, return_sequences=True),
             Dropout(0.2),
             LSTM(units=50, return_sequences=True),
             Dropout(0.2),

@@ -1,3 +1,7 @@
+import os
+os.environ['CUDA_VISIBLE_DEVICES'] = '-1'  # Force CPU usage
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # Suppress TensorFlow warnings
+
 from flask import Flask, request, jsonify, render_template, Response, stream_with_context
 from stock_prediction import StockPredictor
 import yfinance as yf
@@ -6,27 +10,64 @@ from datetime import datetime, timedelta
 import time
 from functools import lru_cache
 import json
+import random
+from threading import Lock
+import queue
 
 app = Flask(__name__)
 predictor = StockPredictor()
 
+# Global rate limiting
+request_queue = queue.Queue()
+last_request_time = 0
+min_request_interval = 2  # Minimum seconds between requests
+rate_limit_lock = Lock()
+
+def wait_for_rate_limit():
+    global last_request_time
+    with rate_limit_lock:
+        current_time = time.time()
+        time_since_last = current_time - last_request_time
+        if time_since_last < min_request_interval:
+            sleep_time = min_request_interval - time_since_last
+            time.sleep(sleep_time)
+        last_request_time = time.time()
+
 # Cache for stock data to reduce API calls
 @lru_cache(maxsize=100)
 def get_stock_data(symbol, start_date, end_date):
-    max_retries = 3
-    retry_delay = 5  # seconds
+    max_retries = 5
+    base_delay = 3  # Increased base delay
     
     for attempt in range(max_retries):
         try:
-            stock_data = yf.download(symbol, start=start_date, end=end_date)
+            # Wait for rate limit
+            wait_for_rate_limit()
+            
+            # Add jitter to avoid synchronized retries
+            jitter = random.uniform(0.5, 1.5)
+            delay = base_delay * (2 ** attempt) * jitter  # Exponential backoff with jitter
+            time.sleep(delay)
+            
+            # Use Ticker object instead of download for better rate limit handling
+            ticker = yf.Ticker(symbol)
+            stock_data = ticker.history(start=start_date, end=end_date)
+            
             if not stock_data.empty:
                 return stock_data
-            time.sleep(retry_delay)
+            elif attempt < max_retries - 1:
+                continue
+            else:
+                raise ValueError(f"No data found for {symbol}")
+                
         except Exception as e:
-            if attempt < max_retries - 1:
-                time.sleep(retry_delay)
+            if "rate limit" in str(e).lower() and attempt < max_retries - 1:
+                # More aggressive backoff for rate limits
+                time.sleep(base_delay * (3 ** attempt) * jitter)
+                continue
             else:
                 raise e
+                
     return pd.DataFrame()
 
 @app.route('/')
@@ -36,9 +77,23 @@ def index():
 @app.route('/predict', methods=['POST'])
 def predict():
     try:
+        if not request.is_json:
+            return jsonify({'error': 'Request must be JSON'}), 400
+            
         data = request.get_json()
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+            
         symbol = data.get('symbol', 'AAPL')
-        days = int(data.get('days', 7))
+        if not isinstance(symbol, str) or not symbol.strip():
+            return jsonify({'error': 'Invalid symbol format'}), 400
+            
+        try:
+            days = int(data.get('days', 7))
+            if days <= 0 or days > 30:
+                return jsonify({'error': 'Days must be between 1 and 30'}), 400
+        except (ValueError, TypeError):
+            return jsonify({'error': 'Invalid days format'}), 400
         
         # Get historical data - using more recent data
         end_date = datetime.now()
@@ -53,6 +108,8 @@ def predict():
                 return jsonify({'error': f'Stock {symbol} might be delisted or not available on Yahoo Finance. Please try a different symbol.'}), 400
             elif "no data found" in error_msg.lower():
                 return jsonify({'error': f'No data found for {symbol}. Please check if the symbol is correct.'}), 400
+            elif "rate limit" in error_msg.lower():
+                return jsonify({'error': 'Yahoo Finance rate limit reached. Please try again in a few minutes.'}), 429
             else:
                 return jsonify({'error': f'Error fetching data for {symbol}: {error_msg}'}), 400
         

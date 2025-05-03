@@ -13,6 +13,12 @@ from datetime import datetime, timedelta
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 import time
 from random import randint
+from functools import wraps
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 class Agent():
     def __init__(self, config: dict):
@@ -178,3 +184,66 @@ class Agent():
         except Exception as e:
             print(f"Error in backtesting: {str(e)}")
             raise
+
+def rate_limit(max_attempts=3, delay=1):
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            attempts = 0
+            while attempts < max_attempts:
+                try:
+                    return func(*args, **kwargs)
+                except Exception as e:
+                    attempts += 1
+                    if "Rate limited" in str(e) and attempts < max_attempts:
+                        wait_time = delay * (2 ** (attempts - 1))  # Exponential backoff
+                        logger.warning(f"Rate limited. Waiting {wait_time} seconds before retry...")
+                        time.sleep(wait_time)
+                    else:
+                        raise
+            return None
+        return wrapper
+    return decorator
+
+@rate_limit(max_attempts=3, delay=1)
+def get_stock_data(symbol, period="1y"):
+    """
+    Fetch stock data with rate limiting and retry logic
+    
+    Args:
+        symbol (str): Stock symbol
+        period (str): Time period for historical data (default: "1y")
+    
+    Returns:
+        pandas.DataFrame: Stock data
+    """
+    try:
+        stock = yf.Ticker(symbol)
+        data = stock.history(period=period)
+        if data.empty:
+            raise ValueError(f"No data found for symbol {symbol}")
+        return data
+    except Exception as e:
+        logger.error(f"Error fetching data for {symbol}: {str(e)}")
+        raise
+
+def get_multiple_stocks(symbols, period="1y"):
+    """
+    Fetch data for multiple stocks with rate limiting
+    
+    Args:
+        symbols (list): List of stock symbols
+        period (str): Time period for historical data (default: "1y")
+    
+    Returns:
+        dict: Dictionary of stock data with symbols as keys
+    """
+    results = {}
+    for symbol in symbols:
+        try:
+            data = get_stock_data(symbol, period)
+            results[symbol] = data
+        except Exception as e:
+            logger.error(f"Failed to fetch data for {symbol}: {str(e)}")
+            results[symbol] = None
+    return results
