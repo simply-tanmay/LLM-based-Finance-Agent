@@ -71,11 +71,13 @@ def get_stock_data(symbol, start_date, end_date):
     return pd.DataFrame()
 
 @app.route('/')
-def index():
-    return render_template('index.html')
+def landing():
+    return render_template('landing.html')
 
-@app.route('/predict', methods=['POST'])
+@app.route('/predict', methods=['GET', 'POST'])
 def predict():
+    if request.method == 'GET':
+        return render_template('index.html')
     try:
         if not request.is_json:
             return jsonify({'error': 'Request must be JSON'}), 400

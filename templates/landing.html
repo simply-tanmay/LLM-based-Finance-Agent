@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Finance AI Bot - Landing</title>
+    <style>
+        :root {
+            --night-blue1: #0a2342;
+            --night-blue2: #19335a;
+            --night-blue3: #274472;
+            --white: #f8fafd;
+            --box-bg: rgba(20, 30, 50, 0.85);
+            --accent: #3a8dde;
+        }
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
+            background: linear-gradient(120deg, var(--night-blue1), var(--night-blue2), var(--night-blue3));
+            background-size: 200% 200%;
+            animation: gradientMove 8s ease-in-out infinite;
+            color: var(--white);
+        }
+        @keyframes gradientMove {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        .hero {
+            min-height: 60vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding-top: 8vh;
+        }
+        .hero h1 {
+            font-size: 3.5rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            letter-spacing: -2px;
+        }
+        .hero p {
+            font-size: 1.4rem;
+            font-weight: 400;
+            color: #c7d0e0;
+            margin-bottom: 2.5rem;
+        }
+        .scroll-down {
+            font-size: 1.2rem;
+            color: var(--accent);
+            margin-top: 2rem;
+            animation: bounce 2s infinite;
+        }
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(10px); }
+        }
+        .info-section {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 2.5rem;
+            margin: 0 auto;
+            max-width: 900px;
+            padding: 4rem 1rem 2rem 1rem;
+        }
+        .info-boxes {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 2rem;
+            justify-content: center;
+        }
+        .info-box {
+            background: var(--box-bg);
+            border-radius: 1.2rem;
+            box-shadow: 0 4px 24px 0 rgba(0,0,0,0.12);
+            padding: 2rem 2.5rem;
+            min-width: 260px;
+            max-width: 320px;
+            flex: 1 1 260px;
+            transition: transform 0.2s, box-shadow 0.2s;
+            border: 1px solid rgba(58,141,222,0.12);
+        }
+        .info-box:hover {
+            transform: translateY(-8px) scale(1.03);
+            box-shadow: 0 8px 32px 0 rgba(58,141,222,0.18);
+            border: 1.5px solid var(--accent);
+        }
+        .info-box h2 {
+            font-size: 1.4rem;
+            font-weight: 600;
+            margin-bottom: 0.7rem;
+            color: var(--accent);
+        }
+        .info-box p {
+            font-size: 1.05rem;
+            color: #e0e6f0;
+            line-height: 1.6;
+        }
+        .go-predict-btn {
+            margin: 3.5rem auto 2rem auto;
+            display: block;
+            background: var(--accent);
+            color: var(--white);
+            font-size: 1.3rem;
+            font-weight: 600;
+            border: none;
+            border-radius: 2rem;
+            padding: 1rem 3.5rem;
+            cursor: pointer;
+            box-shadow: 0 2px 12px 0 rgba(58,141,222,0.18);
+            transition: background 0.2s, transform 0.2s;
+            text-decoration: none;
+        }
+        .go-predict-btn:hover {
+            background: #256bb5;
+            transform: scale(1.04);
+            text-decoration: none;
+        }
+        @media (max-width: 800px) {
+            .info-boxes {
+                flex-direction: column;
+                align-items: center;
+            }
+            .info-section {
+                padding: 2.5rem 0.5rem 1.5rem 0.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="hero">
+        <h1>Finance AI Bot</h1>
+        <p>AI-powered stock prediction, engineered for accuracy and simplicity.<br>Experience the future of finance, today.</p>
+        <div class="scroll-down">▼ Scroll Down</div>
+    </div>
+    <div class="info-section">
+        <div class="info-boxes">
+            <div class="info-box">
+                <h2>What does it do?</h2>
+                <p>Our bot predicts future stock prices using advanced AI models, giving you a data-driven edge in the market.</p>
+            </div>
+            <div class="info-box">
+                <h2>How does it work?</h2>
+                <p>We use LSTM neural networks trained on historical data and real-time market feeds, ensuring robust and adaptive predictions.</p>
+            </div>
+            <div class="info-box">
+                <h2>Why use it?</h2>
+                <p>Fast, reliable, and easy to use. Get actionable insights in seconds, with a clean and intuitive interface.</p>
+            </div>
+            <div class="info-box">
+                <h2>Security & Privacy</h2>
+                <p>Your data is never stored or shared. All predictions are computed in real-time, ensuring your privacy and security.</p>
+            </div>
+        </div>
+        <a href="/predict"><button class="go-predict-btn">Try the Bot →</button></a>
+    </div>
+    <script>
+        // Smooth scroll to info section on scroll-down click
+        document.querySelector('.scroll-down').onclick = function() {
+            document.querySelector('.info-section').scrollIntoView({ behavior: 'smooth' });
+        };
+    </script>
+</body>
+</html> 

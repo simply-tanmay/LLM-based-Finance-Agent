@@ -3,143 +3,269 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stock Price Predictor</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <title>Finance AI Bot - Prediction</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        body {
-            background-color: #f8f9fa;
-            padding-top: 2rem;
+        :root {
+            --night-blue1: #0a2342;
+            --night-blue2: #19335a;
+            --night-blue3: #274472;
+            --white: #f8fafd;
+            --box-bg: rgba(20, 30, 50, 0.92);
+            --accent: #3a8dde;
+            --console-bg: #101a2b;
+            --console-text: #b8c7e0;
+            --console-accent: #3a8dde;
+            --console-error: #ff5c5c;
+            --console-success: #4ec9b0;
         }
-        .card {
-            border-radius: 15px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            margin-bottom: 2rem;
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
+            background: linear-gradient(120deg, var(--night-blue1), var(--night-blue2), var(--night-blue3));
+            background-size: 200% 200%;
+            animation: gradientMove 8s ease-in-out infinite;
+            color: var(--white);
+        }
+        @keyframes gradientMove {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        .main-container {
+            display: flex;
+            flex-direction: row;
+            height: 100vh;
+            width: 100vw;
+        }
+        .left-panel {
+            width: 75vw;
+            min-width: 600px;
+            padding: 3rem 2rem 2rem 3rem;
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+        }
+        .right-panel {
+            width: 25vw;
+            min-width: 320px;
+            background: var(--console-bg);
+            display: flex;
+            flex-direction: column;
+            padding: 2rem 1rem 2rem 1rem;
+            box-shadow: -2px 0 16px 0 rgba(10,35,66,0.12);
+        }
+        .box {
+            background: var(--box-bg);
+            border-radius: 1.2rem;
+            box-shadow: 0 4px 24px 0 rgba(0,0,0,0.10);
+            padding: 2rem 2.5rem;
+            margin-bottom: 1.5rem;
+            border: 1px solid rgba(58,141,222,0.10);
+        }
+        .form-title {
+            font-size: 2.1rem;
+            font-weight: 700;
+            margin-bottom: 1.5rem;
+            letter-spacing: -1px;
+        }
+        .form-group {
+            margin-bottom: 1.7rem;
+            position: relative;
+        }
+        .form-group input {
+            width: 100%;
+            max-width: 350px;
+            box-sizing: border-box;
+            padding: 1.1rem 1.2rem 1.1rem 2.5rem;
+            border-radius: 0.8rem;
+            border: 1.5px solid #2a3b5c;
+            background: #16213a;
+            color: var(--white);
+            font-size: 1.1rem;
+            outline: none;
+            transition: border 0.2s, box-shadow 0.2s;
+        }
+        .form-group input:focus {
+            border: 1.5px solid var(--accent);
+            box-shadow: 0 0 0 2px rgba(58,141,222,0.15);
+        }
+        .form-group label {
+            position: absolute;
+            left: 2.5rem;
+            top: 1.1rem;
+            color: #b8c7e0;
+            font-size: 1.1rem;
+            pointer-events: none;
+            transition: 0.2s;
+            background: transparent;
+        }
+        .form-group input:focus + label,
+        .form-group input:not(:placeholder-shown) + label {
+            top: -0.9rem;
+            left: 1.2rem;
+            font-size: 0.95rem;
+            color: var(--accent);
+            background: var(--box-bg);
+            padding: 0 0.3rem;
+        }
+        .form-group .input-icon {
+            position: absolute;
+            left: 0.8rem;
+            top: 1.1rem;
+            color: var(--accent);
+            font-size: 1.2rem;
+        }
+        .predict-btn {
+            background: var(--accent);
+            color: var(--white);
+            font-size: 1.2rem;
+            font-weight: 600;
+            border: none;
+            border-radius: 2rem;
+            padding: 0.9rem 2.5rem;
+            cursor: pointer;
+            box-shadow: 0 2px 12px 0 rgba(58,141,222,0.18);
+            transition: background 0.2s, transform 0.2s;
+            margin-top: 0.5rem;
+        }
+        .predict-btn:hover {
+            background: #256bb5;
+            transform: scale(1.04);
         }
         .loading {
             display: none;
             text-align: center;
-            padding: 2rem;
+            padding: 2rem 0;
         }
-        .results {
-            display: none;
+        .loading .spinner {
+            border: 4px solid #274472;
+            border-top: 4px solid var(--accent);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem auto;
         }
-        .prediction-card {
-            background: linear-gradient(45deg, #2193b0, #6dd5ed);
-            color: white;
-            border-radius: 10px;
-            padding: 1rem;
-            margin: 0.5rem;
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
-        .console {
-            background-color: #1e1e1e;
-            color: #d4d4d4;
-            font-family: 'Courier New', monospace;
-            padding: 1rem;
-            border-radius: 5px;
-            height: 200px;
-            overflow-y: auto;
-            margin-top: 1rem;
-            white-space: pre-wrap;
-            font-size: 0.9rem;
+        .results-box {
+            background: var(--box-bg);
+            border-radius: 1.2rem;
+            box-shadow: 0 4px 24px 0 rgba(0,0,0,0.10);
+            padding: 2rem 2.5rem;
+            margin-bottom: 1.5rem;
+            border: 1px solid rgba(58,141,222,0.10);
         }
-        .console .info {
-            color: #569cd6;
-        }
-        .console .warning {
-            color: #dcdcaa;
-        }
-        .console .error {
-            color: #f14c4c;
-        }
-        .console .success {
-            color: #4ec9b0;
-        }
-        .console .training {
-            color: #dcdcaa;
-        }
-        .chart-container {
-            position: relative;
-            height: 300px;
+        .summary-row {
+            display: flex;
+            gap: 2rem;
             margin-bottom: 2rem;
         }
+        .summary-box {
+            flex: 1;
+            background: #16213a;
+            border-radius: 0.8rem;
+            padding: 1.2rem 1.5rem;
+            color: var(--white);
+            font-size: 1.2rem;
+            text-align: center;
+            border: 1.5px solid #2a3b5c;
+            box-shadow: 0 2px 8px 0 rgba(58,141,222,0.10);
+        }
+        .chart-container {
+            background: #16213a;
+            border-radius: 0.8rem;
+            padding: 1.5rem 1.5rem 1rem 1.5rem;
+            margin-bottom: 2rem;
+            border: 1.5px solid #2a3b5c;
+            box-shadow: 0 2px 8px 0 rgba(58,141,222,0.10);
+        }
+        .chart-container canvas {
+            background: transparent !important;
+        }
+        .console-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: var(--accent);
+            margin-bottom: 1rem;
+            letter-spacing: 1px;
+        }
+        .console-box {
+            background: var(--console-bg);
+            color: var(--console-text);
+            border-radius: 1.2rem;
+            padding: 1.5rem 1rem;
+            height: 80vh;
+            overflow-y: auto;
+            font-family: 'Fira Mono', 'Consolas', 'Courier New', monospace;
+            font-size: 1rem;
+            box-shadow: 0 4px 24px 0 rgba(0,0,0,0.10);
+            border: 1.5px solid #22304a;
+        }
+        .console-box .info { color: var(--console-accent); }
+        .console-box .success { color: var(--console-success); }
+        .console-box .error { color: var(--console-error); }
+        .console-box .training { color: #dcdcaa; }
+        .console-box .jargon { color: #8ecae6; font-style: italic; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="row justify-content-center">
-            <div class="col-md-8">
-                <div class="card">
-                    <div class="card-body">
-                        <h2 class="card-title text-center mb-4">Stock Price Predictor</h2>
-                        <form id="predictionForm">
-                            <div class="mb-3">
-                                <label for="symbol" class="form-label">Stock Symbol</label>
-                                <input type="text" class="form-control" id="symbol" name="symbol" value="AAPL" required>
-                            </div>
-                            <div class="mb-3">
-                                <label for="days" class="form-label">Days to Predict</label>
-                                <input type="number" class="form-control" id="days" name="days" value="7" min="1" max="30" required>
-                            </div>
-                            <div class="text-center mt-4">
-                                <button type="submit" class="btn btn-primary">Predict</button>
-                            </div>
-                        </form>
+    <div class="main-container">
+        <div class="left-panel">
+            <div class="box">
+                <div class="form-title">Stock Prediction</div>
+                <form id="predictionForm" autocomplete="off">
+                    <div class="form-group">
+                        <span class="input-icon"><i class="fa-solid fa-chart-line"></i></span>
+                        <input type="text" id="symbol" name="symbol" required placeholder=" " value="AAPL">
+                        <label for="symbol">Stock Symbol</label>
+                    </div>
+                    <div class="form-group">
+                        <span class="input-icon"><i class="fa-solid fa-calendar-days"></i></span>
+                        <input type="number" id="days" name="days" required min="1" max="30" placeholder=" " value="7">
+                        <label for="days">Days to Predict</label>
+                    </div>
+                    <button type="submit" class="predict-btn"><i class="fa-solid fa-robot"></i> Predict</button>
+                </form>
+                <div class="loading" id="loadingBox">
+                    <div class="spinner"></div>
+                    <p>Crunching numbers, calibrating neural nets...</p>
+                </div>
+            </div>
+            <div class="results-box" id="resultsBox" style="display:none;">
+                <div class="summary-row">
+                    <div class="summary-box">
+                        <div style="font-size:1.1rem; color:var(--accent);">Current Price</div>
+                        <div id="currentPrice" style="font-size:2rem; font-weight:700; margin-top:0.5rem;">-</div>
+                    </div>
+                    <div class="summary-box">
+                        <div style="font-size:1.1rem; color:var(--accent);">Next Day Prediction</div>
+                        <div id="nextDayPrediction" style="font-size:2rem; font-weight:700; margin-top:0.5rem;">-</div>
                     </div>
                 </div>
-
-                <div class="loading">
-                    <div class="spinner-border text-primary" role="status">
-                        <span class="visually-hidden">Loading...</span>
-                    </div>
-                    <p class="mt-2">Making predictions...</p>
+                <div class="chart-container">
+                    <canvas id="historicalChart"></canvas>
                 </div>
-
-                <div class="results">
-                    <div class="card">
-                        <div class="card-body">
-                            <h3 class="card-title text-center mb-4">Prediction Results</h3>
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <div class="prediction-card">
-                                        <h5>Current Price</h5>
-                                        <p id="currentPrice">-</p>
-                                    </div>
-                                </div>
-                                <div class="col-md-6">
-                                    <div class="prediction-card">
-                                        <h5>Next Day Prediction</h5>
-                                        <p id="nextDayPrediction">-</p>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="chart-container">
-                                <canvas id="historicalChart"></canvas>
-                            </div>
-                            <div class="chart-container">
-                                <canvas id="predictionChart"></canvas>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="card mt-4">
-                    <div class="card-body">
-                        <h4 class="card-title">Console Output</h4>
-                        <div id="console" class="console"></div>
-                    </div>
+                <div class="chart-container">
+                    <canvas id="predictionChart"></canvas>
                 </div>
             </div>
         </div>
+        <div class="right-panel">
+            <div class="console-title"><i class="fa-solid fa-terminal"></i>Console</div>
+            <div class="console-box" id="console"></div>
+        </div>
     </div>
-
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
         let historicalChart = null;
         let predictionChart = null;
         const consoleElement = document.getElementById('console');
-
         function logToConsole(message, type = 'info') {
             const timestamp = new Date().toLocaleTimeString();
             const logEntry = document.createElement('div');
@@ -148,66 +274,63 @@
             consoleElement.appendChild(logEntry);
             consoleElement.scrollTop = consoleElement.scrollHeight;
         }
-
+        function logJargon() {
+            const jargon = [
+                'Initializing quantum weights...',
+                'Spinning up LSTM layers...',
+                'Fetching market sentiment vectors...',
+                'Optimizing hyperparameters...',
+                'Engaging neural attention mechanisms...',
+                'Synthesizing prediction tensors...',
+                'Backpropagating through time...',
+                'Activating dropout regularization...',
+                'Normalizing input features...',
+                'Sampling stochastic gradients...'
+            ];
+            logToConsole(jargon[Math.floor(Math.random() * jargon.length)], 'jargon');
+        }
         document.getElementById('predictionForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-            
             // Clear console
             consoleElement.innerHTML = '';
-            
             // Show loading
-            document.querySelector('.loading').style.display = 'block';
-            document.querySelector('.results').style.display = 'none';
-            
+            document.getElementById('loadingBox').style.display = 'block';
+            document.getElementById('resultsBox').style.display = 'none';
+            logToConsole('Booting up prediction engine...', 'info');
+            logJargon();
             try {
                 const symbol = document.getElementById('symbol').value;
                 const days = document.getElementById('days').value;
-                
                 logToConsole(`Starting prediction for ${symbol} (${days} days)`, 'info');
                 logToConsole('Fetching historical data...', 'info');
-                
+                logJargon();
                 const response = await fetch('/predict', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ symbol, days: parseInt(days) })
                 });
-                
-                // Handle streaming response
                 const reader = response.body.getReader();
                 let result = '';
-                
                 while (true) {
                     const { done, value } = await reader.read();
                     if (done) break;
-                    
-                    // Convert the chunk to text
                     const chunk = new TextDecoder().decode(value);
                     result += chunk;
-                    
-                    // Try to parse the chunk as JSON
                     try {
                         const data = JSON.parse(result);
                         if (data.status === 'training') {
                             logToConsole(data.message, 'training');
-                            result = ''; // Clear the result after processing
+                            logJargon();
+                            result = '';
                         } else {
-                            // This is the final response
                             logToConsole('Data fetched successfully', 'success');
                             logToConsole('Training model on historical data...', 'info');
-                            
-                            // Update current price and next day prediction
+                            logJargon();
                             document.getElementById('currentPrice').textContent = `$${data.last_price.toFixed(2)}`;
                             document.getElementById('nextDayPrediction').textContent = `$${data.prediction[0].toFixed(2)}`;
-                            
-                            // Create or update historical chart
+                            // Historical Chart
                             const historicalCtx = document.getElementById('historicalChart').getContext('2d');
-                            if (historicalChart) {
-                                historicalChart.destroy();
-                            }
-                            
-                            logToConsole('Generating historical data chart...', 'info');
+                            if (historicalChart) historicalChart.destroy();
                             historicalChart = new Chart(historicalCtx, {
                                 type: 'line',
                                 data: {
@@ -215,34 +338,33 @@
                                     datasets: [{
                                         label: 'Historical Price',
                                         data: data.training_data,
-                                        borderColor: 'rgb(255, 99, 132)',
-                                        tension: 0.1
+                                        borderColor: '#3a8dde',
+                                        backgroundColor: 'rgba(58,141,222,0.15)',
+                                        tension: 0.2,
+                                        pointRadius: 0
                                     }]
                                 },
                                 options: {
                                     responsive: true,
                                     maintainAspectRatio: false,
                                     plugins: {
+                                        legend: { labels: { color: '#b8c7e0' } },
                                         title: {
                                             display: true,
-                                            text: `${symbol} Historical Prices`
+                                            text: `${symbol} Historical Prices`,
+                                            color: '#b8c7e0',
+                                            font: { size: 18 }
                                         }
                                     },
                                     scales: {
-                                        y: {
-                                            beginAtZero: false
-                                        }
+                                        x: { ticks: { color: '#b8c7e0' }, grid: { color: '#22304a' } },
+                                        y: { ticks: { color: '#b8c7e0' }, grid: { color: '#22304a' } }
                                     }
                                 }
                             });
-                            
-                            // Create or update prediction chart
+                            // Prediction Chart
                             const predictionCtx = document.getElementById('predictionChart').getContext('2d');
-                            if (predictionChart) {
-                                predictionChart.destroy();
-                            }
-                            
-                            logToConsole('Generating prediction chart...', 'info');
+                            if (predictionChart) predictionChart.destroy();
                             predictionChart = new Chart(predictionCtx, {
                                 type: 'line',
                                 data: {
@@ -250,47 +372,46 @@
                                     datasets: [{
                                         label: 'Predicted Price',
                                         data: data.prediction,
-                                        borderColor: 'rgb(75, 192, 192)',
-                                        tension: 0.1
+                                        borderColor: '#4ec9b0',
+                                        backgroundColor: 'rgba(76,201,176,0.15)',
+                                        tension: 0.2,
+                                        pointRadius: 0
                                     }]
                                 },
                                 options: {
                                     responsive: true,
                                     maintainAspectRatio: false,
                                     plugins: {
+                                        legend: { labels: { color: '#b8c7e0' } },
                                         title: {
                                             display: true,
-                                            text: `${symbol} Price Predictions`
+                                            text: `${symbol} Predicted Prices`,
+                                            color: '#b8c7e0',
+                                            font: { size: 18 }
                                         }
                                     },
                                     scales: {
-                                        y: {
-                                            beginAtZero: false
-                                        }
+                                        x: { ticks: { color: '#b8c7e0' }, grid: { color: '#22304a' } },
+                                        y: { ticks: { color: '#b8c7e0' }, grid: { color: '#22304a' } }
                                     }
                                 }
                             });
-                            
-                            logToConsole('Prediction complete!', 'success');
-                            
-                            // Show results
-                            document.querySelector('.loading').style.display = 'none';
-                            document.querySelector('.results').style.display = 'block';
+                            document.getElementById('resultsBox').style.display = 'block';
+                            document.getElementById('loadingBox').style.display = 'none';
+                            logToConsole('Prediction complete. Results displayed.', 'success');
+                            logJargon();
+                            playAsciiAnimation();
                         }
-                    } catch (e) {
-                        // If parsing fails, continue accumulating chunks
-                        continue;
+                    } catch (err) {
+                        // Not a complete JSON yet, keep accumulating
                     }
                 }
-            } catch (error) {
-                logToConsole(`Error: ${error.message}`, 'error');
-                document.querySelector('.loading').style.display = 'none';
+            } catch (err) {
+                logToConsole('An error occurred: ' + err, 'error');
+                logJargon();
+                document.getElementById('loadingBox').style.display = 'none';
             }
         });
-
-        // Initial console message
-        logToConsole('Stock Price Predictor initialized', 'info');
-        logToConsole('Enter a stock symbol and number of days to predict', 'info');
     </script>
 </body>
 </html> 
