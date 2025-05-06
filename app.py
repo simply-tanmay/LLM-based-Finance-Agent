@@ -13,9 +13,21 @@ import json
 import random
 from threading import Lock
 import queue
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
-predictor = StockPredictor()
+
+# Initialize predictor with error handling
+try:
+    predictor = StockPredictor()
+    logger.info("StockPredictor initialized successfully")
+except Exception as e:
+    logger.error(f"Error initializing StockPredictor: {str(e)}")
+    predictor = None
 
 # Global rate limiting
 request_queue = queue.Queue()
@@ -78,6 +90,10 @@ def landing():
 def predict():
     if request.method == 'GET':
         return render_template('index.html')
+    
+    if predictor is None:
+        return jsonify({'error': 'Prediction service is not available. Please try again later.'}), 503
+        
     try:
         if not request.is_json:
             return jsonify({'error': 'Request must be JSON'}), 400
@@ -97,13 +113,14 @@ def predict():
         except (ValueError, TypeError):
             return jsonify({'error': 'Invalid days format'}), 400
         
-        # Get historical data - using more recent data
+        # Get historical data
         end_date = datetime.now()
-        start_date = end_date - timedelta(days=90)  # Using last 90 days to ensure we have enough data
+        start_date = end_date - timedelta(days=90)
         
-        # Use cached function to get stock data
+        print("ABOUT TO FETCH STOCK DATA...")  # Debug log
         try:
             stock_data = get_stock_data(symbol, start_date, end_date)
+            print("STOCK DATA FETCHED!")  # Debug log
         except Exception as e:
             error_msg = str(e)
             if "delisted" in error_msg.lower():
@@ -127,18 +144,18 @@ def predict():
             try:
                 # Create a function to log training progress
                 def log_training_progress(message):
+                    print(f"TRAINING LOG: {message}")  # Debug log
+                    return message
+
+                print("STARTING TRAINING...")  # Debug log
+                for message in predictor.train(df, epochs=50, batch_size=32, log_function=log_training_progress):
+                    print(f"YIELDING TRAINING MSG: {message}")  # Debug log
                     yield json.dumps({'status': 'training', 'message': message}) + '\n'
-                
-                # Train the model on the recent data
-                predictor.train(df, epochs=50, batch_size=32, log_function=log_training_progress)
-                
-                # Make prediction
+
+                print("STARTING PREDICTION...")  # Debug log
                 prediction = predictor.predict(df, days)
-                
-                # Get the actual current price from the most recent data point
                 current_price = df['Close'].iloc[-1]
-                
-                # Send final response
+                print("YIELDING FINAL RESULT...")  # Debug log
                 yield json.dumps({
                     'symbol': symbol,
                     'prediction': prediction.tolist(),
@@ -146,20 +163,22 @@ def predict():
                     'training_data': df['Close'].tolist(),
                     'training_dates': df.index.strftime('%Y-%m-%d').tolist()
                 }) + '\n'
-                
-            except ValueError as e:
-                yield json.dumps({'error': str(e)}) + '\n'
             except Exception as e:
+                print(f"ERROR: {e}")  # Debug log
                 yield json.dumps({'error': str(e)}) + '\n'
         
         return Response(stream_with_context(generate()), mimetype='application/json')
         
     except Exception as e:
+        logger.error(f"Error in predict endpoint: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/health', methods=['GET'])
 def health():
-    return jsonify({'status': 'healthy'})
+    return jsonify({
+        'status': 'healthy',
+        'predictor_initialized': predictor is not None
+    })
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True) 

@@ -63,7 +63,12 @@ class StockPredictor:
         
         callbacks = []
         if log_function:
-            callbacks.append(TrainingProgressCallback(log_function))
+            class ProgressCallback(Callback):
+                def on_epoch_end(self, epoch, logs=None):
+                    message = log_function(f"Epoch {epoch + 1}/{epochs} - Loss: {logs.get('loss', 0):.6f}")
+                    if message:
+                        yield message
+            callbacks.append(ProgressCallback())
         
         history = self.model.fit(
             X, y, 
@@ -76,7 +81,9 @@ class StockPredictor:
         # Return the final loss
         final_loss = history.history['loss'][-1]
         if log_function:
-            log_function(f"Training complete - Final loss: {final_loss:.6f}")
+            message = log_function(f"Training complete - Final loss: {final_loss:.6f}")
+            if message:
+                yield message
         
     def predict(self, data, days=7):
         # Ensure data is in the correct format

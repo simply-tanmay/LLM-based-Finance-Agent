@@ -233,12 +233,13 @@
                     </div>
                     <button type="submit" class="predict-btn"><i class="fa-solid fa-robot"></i> Predict</button>
                 </form>
-                <div class="loading" id="loadingBox">
+                <div id="loading" class="loading">
                     <div class="spinner"></div>
                     <p>Crunching numbers, calibrating neural nets...</p>
                 </div>
+                <div id="error-message" class="error-message" style="display: none; color: var(--console-error); margin-top: 1rem;"></div>
             </div>
-            <div class="results-box" id="resultsBox" style="display:none;">
+            <div id="results" class="results-box" style="display: none;">
                 <div class="summary-row">
                     <div class="summary-box">
                         <div style="font-size:1.1rem; color:var(--accent);">Current Price</div>
@@ -258,159 +259,170 @@
             </div>
         </div>
         <div class="right-panel">
-            <div class="console-title"><i class="fa-solid fa-terminal"></i>Console</div>
-            <div class="console-box" id="console"></div>
+            <div class="console-title"><i class="fa-solid fa-terminal"></i> Console</div>
+            <div id="console" class="console-box"></div>
         </div>
     </div>
+
     <script>
         let historicalChart = null;
         let predictionChart = null;
-        const consoleElement = document.getElementById('console');
+
         function logToConsole(message, type = 'info') {
-            const timestamp = new Date().toLocaleTimeString();
-            const logEntry = document.createElement('div');
-            logEntry.className = type;
-            logEntry.textContent = `[${timestamp}] ${message}`;
-            consoleElement.appendChild(logEntry);
-            consoleElement.scrollTop = consoleElement.scrollHeight;
+            const consoleBox = document.getElementById('console');
+            const messageElement = document.createElement('div');
+            messageElement.className = type;
+            messageElement.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            consoleBox.appendChild(messageElement);
+            consoleBox.scrollTop = consoleBox.scrollHeight;
         }
-        function logJargon() {
-            const jargon = [
-                'Initializing quantum weights...',
-                'Spinning up LSTM layers...',
-                'Fetching market sentiment vectors...',
-                'Optimizing hyperparameters...',
-                'Engaging neural attention mechanisms...',
-                'Synthesizing prediction tensors...',
-                'Backpropagating through time...',
-                'Activating dropout regularization...',
-                'Normalizing input features...',
-                'Sampling stochastic gradients...'
-            ];
-            logToConsole(jargon[Math.floor(Math.random() * jargon.length)], 'jargon');
-        }  
-        document.getElementById('predictionForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
+
+        async function predictStock() {
+            const symbol = document.getElementById('symbol').value.toUpperCase();
+            const days = document.getElementById('days').value;
+            
+            // Show loading state
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('results').style.display = 'none';
+            document.getElementById('error-message').style.display = 'none';
+            
             // Clear console
-            consoleElement.innerHTML = '';
-            // Show loading
-            document.getElementById('loadingBox').style.display = 'block';
-            document.getElementById('resultsBox').style.display = 'none';
+            document.getElementById('console').innerHTML = '';
             logToConsole('Booting up prediction engine...', 'info');
-            logJargon();
+            
             try {
-                const symbol = document.getElementById('symbol').value;
-                const days = document.getElementById('days').value;
-                logToConsole(`Starting prediction for ${symbol} (${days} days)`, 'info');
-                logToConsole('Fetching historical data...', 'info');
-                logJargon();
                 const response = await fetch('/predict', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
                     body: JSON.stringify({ symbol, days: parseInt(days) })
                 });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
                 const reader = response.body.getReader();
-                let result = '';
+                const decoder = new TextDecoder();
+                let buffer = '';
+
                 while (true) {
-                    const { done, value } = await reader.read();
+                    const {value, done} = await reader.read();
                     if (done) break;
-                    const chunk = new TextDecoder().decode(value);
-                    result += chunk;
-                    try {
-                        const data = JSON.parse(result);
-                        if (data.status === 'training') {
-                            logToConsole(data.message, 'training');
-                            logJargon();
-                            result = '';
-                        } else {
-                            logToConsole('Data fetched successfully', 'success');
-                            logToConsole('Training model on historical data...', 'info');
-                            logJargon();
-                            document.getElementById('currentPrice').textContent = `$${data.last_price.toFixed(2)}`;
-                            document.getElementById('nextDayPrediction').textContent = `$${data.prediction[0].toFixed(2)}`;
-                            // Historical Chart
-                            const historicalCtx = document.getElementById('historicalChart').getContext('2d');
-                            if (historicalChart) historicalChart.destroy();
-                            historicalChart = new Chart(historicalCtx, {
-                                type: 'line',
-                                data: {
-                                    labels: data.training_dates,
-                                    datasets: [{
-                                        label: 'Historical Price',
-                                        data: data.training_data,
-                                        borderColor: '#3a8dde',
-                                        backgroundColor: 'rgba(58,141,222,0.15)',
-                                        tension: 0.2,
-                                        pointRadius: 0
-                                    }]
-                                },
-                                options: {
-                                    responsive: true,
-                                    maintainAspectRatio: false,
-                                    plugins: {
-                                        legend: { labels: { color: '#b8c7e0' } },
-                                        title: {
-                                            display: true,
-                                            text: `${symbol} Historical Prices`,
-                                            color: '#b8c7e0',
-                                            font: { size: 18 }
-                                        }
-                                    },
-                                    scales: {
-                                        x: { ticks: { color: '#b8c7e0' }, grid: { color: '#22304a' } },
-                                        y: { ticks: { color: '#b8c7e0' }, grid: { color: '#22304a' } }
-                                    }
+                    
+                    buffer += decoder.decode(value, {stream: true});
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop() || '';
+
+                    for (const line of lines) {
+                        if (line.trim()) {
+                            try {
+                                const data = JSON.parse(line);
+                                if (data.error) {
+                                    throw new Error(data.error);
                                 }
-                            });
-                            // Prediction Chart
-                            const predictionCtx = document.getElementById('predictionChart').getContext('2d');
-                            if (predictionChart) predictionChart.destroy();
-                            predictionChart = new Chart(predictionCtx, {
-                                type: 'line',
-                                data: {
-                                    labels: Array.from({length: data.prediction.length}, (_, i) => `Day ${i + 1}`),
-                                    datasets: [{
-                                        label: 'Predicted Price',
-                                        data: data.prediction,
-                                        borderColor: '#4ec9b0',
-                                        backgroundColor: 'rgba(76,201,176,0.15)',
-                                        tension: 0.2,
-                                        pointRadius: 0
-                                    }]
-                                },
-                                options: {
-                                    responsive: true,
-                                    maintainAspectRatio: false,
-                                    plugins: {
-                                        legend: { labels: { color: '#b8c7e0' } },
-                                        title: {
-                                            display: true,
-                                            text: `${symbol} Predicted Prices`,
-                                            color: '#b8c7e0',
-                                            font: { size: 18 }
-                                        }
-                                    },
-                                    scales: {
-                                        x: { ticks: { color: '#b8c7e0' }, grid: { color: '#22304a' } },
-                                        y: { ticks: { color: '#b8c7e0' }, grid: { color: '#22304a' } }
-                                    }
+                                if (data.status === 'training') {
+                                    logToConsole(data.message, 'training');
+                                } else {
+                                    displayResults(data);
                                 }
-                            });
-                            document.getElementById('resultsBox').style.display = 'block';
-                            document.getElementById('loadingBox').style.display = 'none';
-                            logToConsole('Prediction complete. Results displayed.', 'success');
-                            logJargon();
-                            playAsciiAnimation();
+                            } catch (e) {
+                                console.error('Error parsing JSON:', e);
+                            }
                         }
-                    } catch (err) {
-                        // Not a complete JSON yet, keep accumulating
                     }
                 }
-            } catch (err) {
-                logToConsole('An error occurred: ' + err, 'error');
-                logJargon();
-                document.getElementById('loadingBox').style.display = 'none';
+            } catch (error) {
+                console.error('Error:', error);
+                document.getElementById('error-message').textContent = error.message;
+                document.getElementById('error-message').style.display = 'block';
+            } finally {
+                document.getElementById('loading').style.display = 'none';
             }
+        }
+
+        function displayResults(data) {
+            document.getElementById('results').style.display = 'block';
+            document.getElementById('currentPrice').textContent = `$${data.last_price.toFixed(2)}`;
+            document.getElementById('nextDayPrediction').textContent = `$${data.prediction[0].toFixed(2)}`;
+
+            // Historical Chart
+            const historicalCtx = document.getElementById('historicalChart').getContext('2d');
+            if (historicalChart) historicalChart.destroy();
+            historicalChart = new Chart(historicalCtx, {
+                type: 'line',
+                data: {
+                    labels: data.training_dates,
+                    datasets: [{
+                        label: 'Historical Price',
+                        data: data.training_data,
+                        borderColor: '#3a8dde',
+                        backgroundColor: 'rgba(58,141,222,0.15)',
+                        tension: 0.2,
+                        pointRadius: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { labels: { color: '#b8c7e0' } },
+                        title: {
+                            display: true,
+                            text: `${data.symbol} Historical Prices`,
+                            color: '#b8c7e0',
+                            font: { size: 18 }
+                        }
+                    },
+                    scales: {
+                        x: { ticks: { color: '#b8c7e0' }, grid: { color: '#22304a' } },
+                        y: { ticks: { color: '#b8c7e0' }, grid: { color: '#22304a' } }
+                    }
+                }
+            });
+
+            // Prediction Chart
+            const predictionCtx = document.getElementById('predictionChart').getContext('2d');
+            if (predictionChart) predictionChart.destroy();
+            predictionChart = new Chart(predictionCtx, {
+                type: 'line',
+                data: {
+                    labels: Array.from({length: data.prediction.length}, (_, i) => `Day ${i + 1}`),
+                    datasets: [{
+                        label: 'Predicted Price',
+                        data: data.prediction,
+                        borderColor: '#4ec9b0',
+                        backgroundColor: 'rgba(76,201,176,0.15)',
+                        tension: 0.2,
+                        pointRadius: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { labels: { color: '#b8c7e0' } },
+                        title: {
+                            display: true,
+                            text: `${data.symbol} Predicted Prices`,
+                            color: '#b8c7e0',
+                            font: { size: 18 }
+                        }
+                    },
+                    scales: {
+                        x: { ticks: { color: '#b8c7e0' }, grid: { color: '#22304a' } },
+                        y: { ticks: { color: '#b8c7e0' }, grid: { color: '#22304a' } }
+                    }
+                }
+            });
+
+            logToConsole('Prediction complete. Results displayed.', 'success');
+        }
+
+        document.getElementById('predictionForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            await predictStock();
         });
     </script>
 </body>
