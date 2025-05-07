@@ -2,7 +2,7 @@ import json
 from datetime import datetime, timedelta
 from utils import Agent
 from stock_prediction import StockPredictor
-import yfinance as yf
+from alpha_vantage_client import get_stock_data
 import pandas as pd
 
 def run_lstm_prediction(symbol='AAPL', days=7):
@@ -17,7 +17,7 @@ def run_lstm_prediction(symbol='AAPL', days=7):
     start_date = end_date - timedelta(days=90)
     
     print(f"Fetching historical data from {start_date} to {end_date}...")
-    stock_data = yf.download(symbol, start=start_date, end=end_date)
+    stock_data = get_stock_data(symbol, start_date, end_date, interval='daily')
     
     if stock_data.empty:
         print("No data found for the given symbol")
@@ -25,7 +25,7 @@ def run_lstm_prediction(symbol='AAPL', days=7):
     
     # Prepare data
     df = pd.DataFrame(stock_data)
-    df = df[['Close']]
+    df = df[['4. close']]  # Alpha Vantage column name
     df.columns = ['Close']
     
     # Train model
@@ -84,5 +84,5 @@ def main():
         print(f"Error in main: {str(e)}")
         raise
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

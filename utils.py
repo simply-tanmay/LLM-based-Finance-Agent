@@ -1,11 +1,5 @@
 import numpy as np
 import pandas as pd
-try:
-    import yfinance_cache as yf
-    print("Using yfinance-cache")
-except ImportError:
-    import yfinance as yf
-    print("Using standard yfinance")
 import matplotlib.pyplot as plt
 import google.generativeai as genai
 from newsapi import NewsApiClient
@@ -15,6 +9,7 @@ import time
 from random import randint
 from functools import wraps
 import logging
+from alpha_vantage_client import get_stock_data
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -59,36 +54,32 @@ class Agent():
     def _get_stock_history_data(self, date: datetime) -> pd.DataFrame:
         start_date = date - timedelta(days=self.config['days'])
         
-        # Add a random delay to avoid rate limiting
-        delay = randint(1, 3)
-        print(f"Waiting {delay} seconds before downloading stock data...")
-        time.sleep(delay)
-        
         try:
-            stock_data = yf.download(self.config['stock_symbol'], start=start_date, end=date)
-            if stock_data.empty:
-                print("No data downloaded. Trying alternative method...")
-                ticker = yf.Ticker(self.config['stock_symbol'])
-                stock_data = ticker.history(start=start_date, end=date)
-            
+            stock_data = get_stock_data(self.config['stock_symbol'], start_date, date, interval='daily')
             if stock_data.empty:
                 raise ValueError(f"No data found for {self.config['stock_symbol']}")
-                
+            
+            # Rename columns to match expected format
+            stock_data = stock_data.rename(columns={
+                '1. open': 'Open',
+                '2. high': 'High',
+                '3. low': 'Low',
+                '4. close': 'Close',
+                '5. volume': 'Volume'
+            })
+            
             return stock_data
         except Exception as e:
             print(f"Error downloading stock data: {str(e)}")
             raise
 
     def _get_stock_news_titles(self, date: datetime) -> list:
-        # Add a random delay to avoid rate limiting
-        delay = randint(1, 3)
-        print(f"Waiting {delay} seconds before fetching news...")
-        time.sleep(delay)
-
         try:
-            stock = yf.Ticker(self.config['stock_symbol'])
-            stock_info = stock.info
-            stock_name = stock_info.get('longName', self.config['stock_symbol'])
+            # Get company name from Alpha Vantage
+            from alpha_vantage_client import AlphaVantageClient
+            client = AlphaVantageClient()
+            company_data = client.get_company_overview(self.config['stock_symbol'])
+            stock_name = company_data['Name'].iloc[0] if not company_data.empty else self.config['stock_symbol']
 
             previous_date = date - timedelta(days=1)
             start_date = previous_date.strftime("%Y-%m-%d")
@@ -111,9 +102,19 @@ class Agent():
     def backtesting(self, start_date: datetime, end_date: datetime, verbose: bool = False) -> pd.DataFrame:
         try:
             print(f"Fetching data for {self.config['stock_symbol']} from {start_date} to {end_date}")
-            stock_history_data = yf.download(self.config['stock_symbol'], start=start_date, end=end_date + timedelta(days=1))
+            stock_history_data = get_stock_data(self.config['stock_symbol'], start_date, end_date, interval='daily')
+            
             if stock_history_data.empty:
                 raise ValueError(f"No data found for {self.config['stock_symbol']} in the specified date range")
+            
+            # Rename columns to match expected format
+            stock_history_data = stock_history_data.rename(columns={
+                '1. open': 'Open',
+                '2. high': 'High',
+                '3. low': 'Low',
+                '4. close': 'Close',
+                '5. volume': 'Volume'
+            })
             
             stock_history_data.reset_index(inplace=True)
             results = []
@@ -121,15 +122,10 @@ class Agent():
             
             print(f"\nStarting backtesting for {total_days} trading days...")
             
-            for i, date in enumerate(stock_history_data['Date']):
+            for i, date in enumerate(stock_history_data['date']):
                 try:
                     print(f"\nProcessing day {i+1}/{total_days}: {date.strftime('%Y-%m-%d')}")
                     actual_price = stock_history_data['Close'][i]
-                    
-                    # Add a delay to avoid rate limiting
-                    delay = randint(1, 3)
-                    print(f"Waiting {delay} seconds before making prediction...")
-                    time.sleep(delay)
                     
                     predicted_price = self.predict(date, verbose)
                     results.append({

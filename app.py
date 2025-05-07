@@ -4,7 +4,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # Suppress TensorFlow warnings
 
 from flask import Flask, request, jsonify, render_template, Response, stream_with_context
 from stock_prediction import StockPredictor
-import yfinance as yf
+from alpha_vantage_client import get_stock_data
 import pandas as pd
 from datetime import datetime, timedelta
 import time
@@ -47,40 +47,15 @@ def wait_for_rate_limit():
 
 # Cache for stock data to reduce API calls
 @lru_cache(maxsize=100)
-def get_stock_data(symbol, start_date, end_date):
-    max_retries = 5
-    base_delay = 3  # Increased base delay
-    
-    for attempt in range(max_retries):
-        try:
-            # Wait for rate limit
-            wait_for_rate_limit()
-            
-            # Add jitter to avoid synchronized retries
-            jitter = random.uniform(0.5, 1.5)
-            delay = base_delay * (2 ** attempt) * jitter  # Exponential backoff with jitter
-            time.sleep(delay)
-            
-            # Use Ticker object instead of download for better rate limit handling
-            ticker = yf.Ticker(symbol)
-            stock_data = ticker.history(start=start_date, end=end_date)
-            
-            if not stock_data.empty:
-                return stock_data
-            elif attempt < max_retries - 1:
-                continue
-            else:
-                raise ValueError(f"No data found for {symbol}")
-                
-        except Exception as e:
-            if "rate limit" in str(e).lower() and attempt < max_retries - 1:
-                # More aggressive backoff for rate limits
-                time.sleep(base_delay * (3 ** attempt) * jitter)
-                continue
-            else:
-                raise e
-                
-    return pd.DataFrame()
+def get_cached_stock_data(symbol, start_date, end_date):
+    """
+    Get stock data with caching to reduce API calls
+    """
+    try:
+        return get_stock_data(symbol, start_date, end_date, interval='daily')
+    except Exception as e:
+        logger.error(f"Error fetching stock data: {str(e)}")
+        raise
 
 @app.route('/')
 def landing():
@@ -117,18 +92,16 @@ def predict():
         end_date = datetime.now()
         start_date = end_date - timedelta(days=90)
         
-        print("ABOUT TO FETCH STOCK DATA...")  # Debug log
+        print("ABOUT TO FETCH STOCK DATA...")
         try:
-            stock_data = get_stock_data(symbol, start_date, end_date)
+            stock_data = get_cached_stock_data(symbol, start_date, end_date)
             print("STOCK DATA FETCHED!")  # Debug log
+            print(f"Data shape: {stock_data.shape}")  # Debug log
+            print(f"Columns: {stock_data.columns}")  # Debug log
         except Exception as e:
             error_msg = str(e)
-            if "delisted" in error_msg.lower():
-                return jsonify({'error': f'Stock {symbol} might be delisted or not available on Yahoo Finance. Please try a different symbol.'}), 400
-            elif "no data found" in error_msg.lower():
+            if "no data found" in error_msg.lower():
                 return jsonify({'error': f'No data found for {symbol}. Please check if the symbol is correct.'}), 400
-            elif "rate limit" in error_msg.lower():
-                return jsonify({'error': 'Yahoo Finance rate limit reached. Please try again in a few minutes.'}), 429
             else:
                 return jsonify({'error': f'Error fetching data for {symbol}: {error_msg}'}), 400
         
@@ -137,8 +110,30 @@ def predict():
             
         # Prepare data for prediction
         df = pd.DataFrame(stock_data)
-        df = df[['Close']]
-        df.columns = ['Close']
+        # Alpha Vantage uses different column names, handle both formats
+        if '4. close' in df.columns:
+            df = df[['4. close']]
+            df.columns = ['Close']
+        elif 'Close' in df.columns:
+            df = df[['Close']]
+        else:
+            return jsonify({'error': f'Unexpected data format for {symbol}. Please try again.'}), 400
+
+        # Debug: Print the first few rows and columns
+        print('DataFrame head:')
+        print(df.head(10))
+        print('DataFrame columns:', df.columns)
+        print('DataFrame index:', df.index)
+        print('Close prices sent to frontend:', df['Close'].tolist())
+        print('Dates sent to frontend:', df.index.strftime('%Y-%m-%d').tolist())
+
+        # Remove NaNs or zeros if present
+        df = df.dropna()
+        df = df[df['Close'] != 0]
+        if df.empty:
+            return jsonify({'error': f'No valid price data found for {symbol}.'}), 400
+        
+        df = df.sort_index()  # Sort by date ascending
         
         def generate():
             try:

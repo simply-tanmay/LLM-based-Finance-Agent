@@ -185,9 +185,16 @@
             margin-bottom: 2rem;
             border: 1.5px solid #2a3b5c;
             box-shadow: 0 2px 8px 0 rgba(58,141,222,0.10);
+            height: 350px;
+        }
+        #predictionChart {
+            height: 420px !important;
+            min-height: 350px;
         }
         .chart-container canvas {
             background: transparent !important;
+            height: 100% !important;
+            min-height: 300px;
         }
         .console-title {
             font-size: 1.2rem;
@@ -251,10 +258,10 @@
                     </div>
                 </div>
                 <div class="chart-container">
-                    <canvas id="historicalChart"></canvas>
+                    <canvas id="historicalChart" height="350"></canvas>
                 </div>
                 <div class="chart-container">
-                    <canvas id="predictionChart"></canvas>
+                    <canvas id="predictionChart" height="420"></canvas>
                 </div>
             </div>
         </div>
@@ -343,6 +350,9 @@
         }
 
         function displayResults(data) {
+            console.log('API response:', data);
+            console.log('Training data:', data.training_data);
+            console.log('Training dates:', data.training_dates);
             document.getElementById('results').style.display = 'block';
             document.getElementById('currentPrice').textContent = `$${data.last_price.toFixed(2)}`;
             document.getElementById('nextDayPrediction').textContent = `$${data.prediction[0].toFixed(2)}`;
@@ -350,6 +360,8 @@
             // Historical Chart
             const historicalCtx = document.getElementById('historicalChart').getContext('2d');
             if (historicalChart) historicalChart.destroy();
+            console.log('Assigning to chart labels:', data.training_dates);
+            console.log('Assigning to chart data:', data.training_data);
             historicalChart = new Chart(historicalCtx, {
                 type: 'line',
                 data: {
